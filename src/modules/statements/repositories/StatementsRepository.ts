@@ -15,12 +15,14 @@ export class StatementsRepository implements IStatementsRepository {
 
   async create({
     user_id,
+    receiver_id,
     amount,
     description,
     type
   }: ICreateStatementDTO): Promise<Statement> {
     const statement = this.repository.create({
       user_id,
+      receiver_id,
       amount,
       description,
       type
@@ -40,12 +42,29 @@ export class StatementsRepository implements IStatementsRepository {
       { balance: number } | { balance: number, statement: Statement[] }
     >
   {
-    const statement = await this.repository.find({
-      where: { user_id }
-    });
+    const statement = await this.repository
+    .createQueryBuilder("statement")
+    .select([
+      "statement.id",
+      "statement.user_id",
+      "statement.receiver_id",
+      "statement.amount",
+      "statement.description",
+      "statement.type",
+      "statement.created_at",
+      "statement.updated_at",
+    ])
+    .where(
+      "statement.user_id = :user_id OR statement.receiver_id = :user_id",
+      {
+        user_id: user_id,
+      }
+    )
+    .getMany();
 
     const balance = statement.reduce((acc, operation) => {
-      if (operation.type === 'deposit') {
+      const userIsReceiver = operation.receiver_id === user_id;
+      if (operation.type === 'deposit'|| (operation.type === "transfer" && userIsReceiver)) {
         return acc + operation.amount;
       } else {
         return acc - operation.amount;
